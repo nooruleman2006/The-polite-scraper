@@ -9,9 +9,27 @@ export function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function attemptFetch(url) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      headers: { "User-Agent": USER_AGENT },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    return { status: response.status, response };
+  } catch (err) {
+    clearTimeout(timeout);
+    return { status: 0, error: err.message };
+  }
+}
+
 /**
  * Fetch a URL politely, caching the result to disk.
- * Returns { html, status, fromCache }.
+ * Retries once on timeout (status 0) or 5xx. Never retries 404 or 403.
+ * Returns { html, status, fromCache, error }.
  */
 export async function politeFetch(url, cachePath) {
   if (fs.existsSync(cachePath)) {
@@ -19,26 +37,19 @@ export async function politeFetch(url, cachePath) {
     return { html, status: 200, fromCache: true };
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  let result = await attemptFetch(url);
 
-  let response;
-  try {
-    response = await fetch(url, {
-      headers: { "User-Agent": USER_AGENT },
-      signal: controller.signal,
-    });
-  } catch (err) {
-    clearTimeout(timeout);
-    return { html: null, status: 0, fromCache: false, error: err.message };
-  }
-  clearTimeout(timeout);
-
-  if (response.status !== 200) {
-    return { html: null, status: response.status, fromCache: false };
+  const shouldRetry = result.status === 0 || (result.status >= 500 && result.status < 600);
+  if (shouldRetry) {
+    await sleep(DELAY_MS);
+    result = await attemptFetch(url);
   }
 
-  const html = await response.text();
+  if (result.status !== 200) {
+    return { html: null, status: result.status, fromCache: false, error: result.error };
+  }
+
+  const html = await result.response.text();
   fs.mkdirSync(path.dirname(cachePath), { recursive: true });
   fs.writeFileSync(cachePath, html, "utf-8");
 

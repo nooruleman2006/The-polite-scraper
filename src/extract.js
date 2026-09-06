@@ -13,7 +13,7 @@ export async function extractBook(bookUrl, sourcePage) {
   const result = await politeFetch(bookUrl, cachePath);
 
   if (result.status !== 200) {
-    return { error: `status ${result.status}`, product_url: bookUrl };
+    return { error: `status ${result.status}`, product_url: bookUrl, fromCache: false };
   }
 
   const $ = cheerio.load(result.html);
@@ -37,5 +37,6 @@ export async function extractBook(bookUrl, sourcePage) {
     description,
     source_page: sourcePage,
     fetched_at: new Date().toISOString(),
+    fromCache: result.fromCache,
   };
 }
