@@ -1,4 +1,4 @@
-# FlyRank A9 - The Polite Scraper
+# The Polite Scraper
 
 A small, polite scraping pipeline for the first 3 catalogue pages of Books to Scrape (books.toscrape.com), a public sandbox built for practicing scraping. It fetches all ~60 book pages, extracts and normalizes their data, validates every record against a schema, survives broken pages without crashing, and ends every run with an honest report.
 
